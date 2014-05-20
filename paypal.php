@@ -1021,8 +1021,8 @@ class PayPal extends PaymentModule
 		$amt = 0.00;
 
 		foreach ($products as $product)
-			$amt += (float)($product['product_price_wt']) * ($product['product_quantity'] - $product['product_quantity_refunded']);
-		$amt += (float)($order->total_shipping) + (float)($order->total_wrapping) - (float)($order->total_discounts);
+			$amt += (float)($product['product_price']) * ($product['product_quantity'] - $product['product_quantity_refunded']); // zebx
+		$amt += (float)($order->total_shipping_tax_excl) + (float)($order->total_wrapping) - (float)($order->total_discounts_tax_excl) + (float)($order->total_paid_tax_incl) - (float)($order->total_paid_tax_excl); // zebx
 
 		// check if total or partial
 		if (Tools::ps_round($order->total_paid_real, $decimals) == Tools::ps_round($amt, $decimals))

@@ -288,11 +288,13 @@ class PaypalExpressCheckout extends Paypal
 
 			$fields['L_PAYMENTREQUEST_0_DESC'.$index] = Tools::substr(strip_tags($product['description_short']), 0, 100).'...';
 
-			$fields['L_PAYMENTREQUEST_0_AMT'.$index] = Tools::ps_round($product['price_wt'], $this->decimals);
+			$fields['L_PAYMENTREQUEST_0_AMT'.$index] = Tools::ps_round($product['price'], $this->decimals);  //zebx without tax
 			$fields['L_PAYMENTREQUEST_0_QTY'.$index] = $product['quantity'];
 
 			$total = $total + ($fields['L_PAYMENTREQUEST_0_AMT'.$index] * $product['quantity']);
 		}
+			$summary = $this->context->cart->getSummaryDetails();  //zebx without tax
+			$fields['PAYMENTREQUEST_0_TAXAMT'] = Tools::ps_round($summary['total_tax'], $this->decimals);  //zebx without tax
 	}
 
 	private function setDiscountsList(&$fields, &$index, &$total)
@@ -309,7 +311,7 @@ class PaypalExpressCheckout extends Paypal
 					$fields['L_PAYMENTREQUEST_0_DESC'.$index] = Tools::substr(strip_tags($discount['description']), 0, 100).'...';
 
 				/* It is a discount so we store a negative value */
-				$fields['L_PAYMENTREQUEST_0_AMT'.$index] = -1 * Tools::ps_round($discount['value_real'], $this->decimals);
+				$fields['L_PAYMENTREQUEST_0_AMT'.$index] = -1 * Tools::ps_round($discount['value_tax_exc'], $this->decimals);  //zebx without tax
 				$fields['L_PAYMENTREQUEST_0_QTY'.$index] = 1;
 
 				$total = Tools::ps_round($total + $fields['L_PAYMENTREQUEST_0_AMT'.$index], $this->decimals);
@@ -336,7 +338,7 @@ class PaypalExpressCheckout extends Paypal
 		if (version_compare(_PS_VERSION_, '1.5', '<'))
 			$shipping_cost_wt = $this->context->cart->getOrderShippingCost();
 		else
-			$shipping_cost_wt = $this->context->cart->getTotalShippingCost();
+			$shipping_cost_wt = $this->context->cart->getTotalShippingCost(null, false); //zebx without tax
 
 		if ((bool)Configuration::get('PAYPAL_CAPTURE'))
 			$fields['PAYMENTREQUEST_0_PAYMENTACTION'] = 'Authorization';
@@ -345,6 +347,7 @@ class PaypalExpressCheckout extends Paypal
 		
 		$currency = new Currency((int)$this->context->cart->id_currency);
 		$fields['PAYMENTREQUEST_0_CURRENCYCODE'] = $currency->iso_code;
+		$summary = $this->context->cart->getSummaryDetails();
 
 		/**
 		 * If the total amount is lower than 1 we put the shipping cost as an item
@@ -359,13 +362,13 @@ class PaypalExpressCheckout extends Paypal
 			$fields['L_PAYMENTREQUEST_0_QTY'.$index] = 1;
 			
 			$fields['PAYMENTREQUEST_0_ITEMAMT'] = Tools::ps_round($total, $this->decimals) + Tools::ps_round($shipping_cost_wt, $this->decimals);
-			$fields['PAYMENTREQUEST_0_AMT'] = $total + Tools::ps_round($shipping_cost_wt, $this->decimals);
+			$fields['PAYMENTREQUEST_0_AMT'] = $total + Tools::ps_round($summary['total_tax'], $this->decimals) + Tools::ps_round($shipping_cost_wt, $this->decimals); //zebx without tax
 		}
 		else
 		{
 			$fields['PAYMENTREQUEST_0_SHIPPINGAMT'] = sprintf('%.2f', $shipping_cost_wt);
 			$fields['PAYMENTREQUEST_0_ITEMAMT'] = Tools::ps_round($total, $this->decimals);
-			$fields['PAYMENTREQUEST_0_AMT'] = sprintf('%.2f', ($total + $fields['PAYMENTREQUEST_0_SHIPPINGAMT']));
+			$fields['PAYMENTREQUEST_0_AMT'] = sprintf('%.2f', ($total + Tools::ps_round($summary['total_tax'], $this->decimals) + $fields['PAYMENTREQUEST_0_SHIPPINGAMT'])); //zebx without tax
 		}
 	}
 
@@ -389,10 +392,12 @@ class PaypalExpressCheckout extends Paypal
 
 		foreach ($this->product_list as $product)
 		{
-			$price = Tools::ps_round($product['price_wt'], $this->decimals);
+			$price = Tools::ps_round($product['price'], $this->decimals);  //zebx without tax
 			$quantity = Tools::ps_round($product['quantity'], $this->decimals);
 			$total = Tools::ps_round($total + ($price * $quantity), $this->decimals);
 		}
+		$summary = $this->context->cart->getSummaryDetails();  //zebx without tax
+		$total += Tools::ps_round($summary['total_tax'], $this->decimals);  //zebx without tax
 
 		if ($this->context->cart->gift == 1)
 			$total = Tools::ps_round($total + $this->getGiftWrappingPrice(), $this->decimals);
@@ -405,13 +410,13 @@ class PaypalExpressCheckout extends Paypal
 		else
 		{
 			$discounts = $this->context->cart->getCartRules();
-			$shipping_cost = $this->context->cart->getTotalShippingCost();
+			$shipping_cost = $this->context->cart->getTotalShippingCost(null, false); //zebx without tax
 		}
 		
 		if (count($discounts) > 0)
 			foreach ($discounts as $product)
 			{
-				$price = -1 * Tools::ps_round($product['value_real'], $this->decimals);
+				$price = -1 * Tools::ps_round($product['value_tax_exc'], $this->decimals); //zebx without tax
 				$total = Tools::ps_round($total + $price, $this->decimals);
 			}
 		
